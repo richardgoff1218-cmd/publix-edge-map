@@ -11,8 +11,8 @@
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
     
     body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: #f8fafc;
+      font-family: 'Inter', system_ui, sans-serif;
+      background: #f1f5f9;
       color: #0f172a;
     }
     
@@ -20,23 +20,30 @@
       font-family: 'Space Grotesk', system_ui, sans-serif;
     }
 
-    .glass {
-      background: rgba(255, 255, 255, 0.75);
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(255,255,255,0.6);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+    .glass-list {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.75);
+      box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.06);
     }
 
     .liquid-card {
-      background: rgba(255,255,255,0.9);
+      background: rgba(255,255,255,0.95);
       backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.7);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid rgba(226,232,240,0.8);
+      transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
     }
     
     .liquid-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+      transform: translateY(-3px) scale(1.01);
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+
+    .liquid-card.selected {
+      border-color: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+      transform: translateY(-1px);
     }
 
     .map-container {
@@ -45,50 +52,29 @@
     }
 
     .store-card {
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.2s cubic-bezier(0.23, 1, 0.32, 1);
     }
     
     .store-card:active {
-      transform: scale(0.97);
+      transform: scale(0.96);
     }
 
     .leaflet-popup-content-wrapper {
       background: white;
       color: #0f172a;
-      border-radius: 16px;
-      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1);
-    }
-
-    .nav-active {
-      color: #0f172a;
-      position: relative;
-    }
-    
-    .nav-active:after {
-      content: '';
-      position: absolute;
-      bottom: -2px;
-      left: 0;
-      width: 100%;
-      height: 2px;
-      background: linear-gradient(to right, #10b981, transparent);
-    }
-
-    .dynamic-highlight {
-      animation: popHighlight 0.6s ease-out;
-    }
-
-    @keyframes popHighlight {
-      0% { transform: scale(0.95); }
-      50% { transform: scale(1.02); }
-      100% { transform: scale(1); }
+      border-radius: 18px;
+      box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
     }
 
     .income-value {
       font-variant-numeric: tabular-nums;
-      background: linear-gradient(90deg, #0f172a, #334155);
+      background: linear-gradient(90deg, #0f172a, #475569);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
+    }
+
+    .dynamic-marker {
+      transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
     }
   </style>
 </head>
@@ -109,13 +95,13 @@
       
       <div class="flex items-center gap-2 text-sm">
         <button onclick="useMyLocation()" 
-                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-2xl text-slate-700 flex items-center gap-1.5 active:scale-95 transition">
+                class="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 flex items-center gap-1.5 active:scale-95 transition shadow-sm">
           <span>📍</span>
-          <span class="hidden sm:inline text-xs font-medium">Locate</span>
+          <span class="hidden sm:inline text-xs font-medium">Locate Me</span>
         </button>
         
         <button onclick="manualRefresh()" 
-                class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-2xl text-slate-700 flex items-center gap-1.5 active:scale-95 transition">
+                class="px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl text-slate-700 flex items-center gap-1.5 active:scale-95 transition shadow-sm">
           <span>⟳</span>
           <span class="hidden sm:inline text-xs font-medium">Refresh</span>
         </button>
@@ -145,26 +131,26 @@
         </div>
       </div>
 
-      <!-- LIST - Liquid Glass -->
-      <div class="w-full lg:w-96 flex flex-col glass rounded-3xl border border-white/60 shadow-xl overflow-hidden lg:h-[calc(100vh-160px)]">
+      <!-- LIST - Strong Liquid Glass -->
+      <div class="w-full lg:w-96 flex flex-col glass-list rounded-3xl overflow-hidden lg:h-[calc(100vh-160px)] border border-white/60">
         
-        <div class="px-4 py-3 border-b border-white/30 bg-white/40">
+        <div class="px-4 py-3 border-b border-white/40 bg-white/30">
           <div class="flex items-center justify-between">
             <div>
-              <div class="font-semibold text-lg tracking-tight text-slate-900">Highest Income</div>
-              <div class="text-[10px] text-emerald-600">Real 2023 Census • Best tips</div>
+              <div class="font-semibold text-lg tracking-tight text-slate-900">Highest Income First</div>
+              <div class="text-[10px] text-emerald-600">Real 2023 Census ACS data</div>
             </div>
-            <div id="count" class="text-xs font-mono bg-white/70 px-2.5 py-1 rounded-full border border-white/50 text-slate-600"></div>
+            <div id="count" class="text-xs font-mono bg-white/80 px-2.5 py-1 rounded-full border border-white/60 text-slate-600 shadow-sm"></div>
           </div>
         </div>
 
-        <div class="p-3 border-b border-white/30">
-          <input id="search" type="text" placeholder="Search stores or ZIP..." 
-                 class="w-full bg-white/70 border border-white/50 focus:border-emerald-300 placeholder:text-slate-400 text-sm px-4 py-2.5 rounded-2xl outline-none transition shadow-inner" oninput="renderList()">
+        <div class="p-3 border-b border-white/30 bg-white/20">
+          <input id="search" type="text" placeholder="Search name or ZIP..." 
+                 class="w-full bg-white/80 border border-white/50 focus:border-emerald-400 placeholder:text-slate-400 text-sm px-4 py-2.5 rounded-2xl outline-none shadow-inner transition" oninput="renderList()">
         </div>
 
         <div id="list" class="flex-1 overflow-auto p-2 space-y-1.5 custom-scroll">
-          <!-- Populated dynamically -->
+          <!-- Populated by JS -->
         </div>
       </div>
       
@@ -172,7 +158,7 @@
   </div>
 
   <!-- Mobile bottom nav -->
-  <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 z-50">
+  <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-slate-200 z-50">
     <div class="flex justify-around text-xs py-2">
       <button onclick="document.getElementById('map').scrollIntoView({behavior:'smooth'})" class="flex flex-col items-center px-4 py-1 text-emerald-600">
         <span class="text-lg">🗺️</span>
@@ -206,6 +192,7 @@ let stores = [
 ];
 
 let map, markers = {};
+let currentSelectedId = null;
 
 function getCurrentBusyness(store) {
   const d = new Date();
@@ -253,7 +240,7 @@ function createMarker(store) {
   const color = getBusynessColor(score);
   
   const icon = L.divIcon({
-    html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;border:3px solid rgba(0,0,0,0.15);box-shadow:0 2px 6px rgba(0,0,0,0.15)">${Math.round(score)}</div>`,
+    html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;border:3px solid rgba(0,0,0,0.12)">${Math.round(score)}</div>`,
     className: '',
     iconSize: [28, 28],
     iconAnchor: [14, 14]
@@ -290,6 +277,56 @@ function refreshMarkers() {
   stores.forEach(createMarker);
 }
 
+function highlightListItem(id) {
+  // Remove previous selection
+  document.querySelectorAll('.liquid-card').forEach(el => el.classList.remove('selected'));
+  
+  // Find and highlight the card
+  const cards = document.querySelectorAll('.liquid-card');
+  cards.forEach(card => {
+    if (card.innerHTML.includes(id) || card.onclick.toString().includes(id)) {
+      card.classList.add('selected');
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  });
+}
+
+function selectStore(id) {
+  const store = stores.find(s => s.id === id);
+  if (!store) return;
+
+  currentSelectedId = id;
+  
+  // Fly map
+  map.flyTo([store.lat, store.lng], 15, { duration: 0.6 });
+  
+  // Highlight in list
+  highlightListItem(id);
+  
+  // Dynamic marker effect
+  const m = markers[id];
+  if (m) {
+    const originalIcon = m.getIcon();
+    
+    // Temporary bigger pulsing marker
+    m.setIcon(L.divIcon({
+      html: `<div style="background:${getBusynessColor(getCurrentBusyness(store))};width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:white;border:5px solid rgba(16,185,129,0.4);box-shadow:0 0 0 12px rgba(16,185,129,0.15);animation:pulse 1.2s infinite">${Math.round(getCurrentBusyness(store))}</div>`,
+      className: '',
+      iconSize: [40,40],
+      iconAnchor: [20,20]
+    }));
+    
+    setTimeout(() => {
+      if (markers[id]) markers[id].setIcon(originalIcon);
+    }, 2200);
+    
+    // Open popup
+    setTimeout(() => {
+      m.openPopup();
+    }, 650);
+  }
+}
+
 function renderList(filter = '') {
   const container = document.getElementById('list');
   container.innerHTML = '';
@@ -306,7 +343,7 @@ function renderList(filter = '') {
     const label = getLabel(score);
     
     const div = document.createElement('div');
-    div.className = `liquid-card p-3 rounded-2xl cursor-pointer flex gap-3 items-center border border-white/50`;
+    div.className = `liquid-card p-3 rounded-2xl cursor-pointer flex gap-3 items-center`;
     
     div.innerHTML = `
       <div style="background:${color}" class="w-8 h-8 flex-shrink-0 rounded-2xl flex items-center justify-center text-white text-sm font-bold shadow">${Math.round(score)}</div>
@@ -319,33 +356,7 @@ function renderList(filter = '') {
       </div>
     `;
     
-    div.onclick = () => {
-      // Dynamic interaction: highlight + fly
-      div.classList.add('dynamic-highlight', 'ring-2', 'ring-emerald-400');
-      
-      map.flyTo([s.lat, s.lng], 15, { duration: 0.55 });
-      
-      const m = markers[s.id];
-      if (m) {
-        setTimeout(() => {
-          m.openPopup();
-          // temporary bigger marker effect
-          const origIcon = m.getIcon();
-          m.setIcon(L.divIcon({
-            html: `<div style="background:${getBusynessColor(getCurrentBusyness(s))};width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:white;border:4px solid rgba(0,0,0,0.15)">${Math.round(getCurrentBusyness(s))}</div>`,
-            className: '',
-            iconSize: [36,36],
-            iconAnchor: [18,18]
-          }));
-          setTimeout(() => m.setIcon(origIcon), 1600);
-        }, 620);
-      }
-      
-      setTimeout(() => {
-        div.classList.remove('dynamic-highlight', 'ring-2', 'ring-emerald-400');
-      }, 900);
-    };
-    
+    div.onclick = () => selectStore(s.id);
     container.appendChild(div);
   });
 }
@@ -370,7 +381,7 @@ function init() {
   const search = document.getElementById('search');
   if (search) search.oninput = () => renderList(search.value);
   
-  console.log('%c[PublixEdge] Light theme + liquid glass UI loaded', 'color:#166534');
+  console.log('%c[PublixEdge] Light theme + strong liquid glass + dynamic interactions loaded', 'color:#166534');
 }
 
 window.onload = init;
