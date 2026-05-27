@@ -3,81 +3,218 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Publix Edge • Central FL</title>
+  <title>Publix Edge</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0a0c14; color: #e2e8f0; }
-    .map-container { box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.55); }
-    .store-card { transition: all 0.15s ease; }
-    .store-card:hover { transform: translateY(-2px); }
-    .leaflet-popup-content-wrapper { background: #11131f; color: #e2e8f0; border-radius: 12px; }
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap');
+    
+    :root {
+      --primary: #10b981;
+    }
+    
+    body {
+      font-family: 'Inter', system_ui, sans-serif;
+    }
+    
+    .font-display {
+      font-family: 'Space Grotesk', system_ui, sans-serif;
+    }
+
+    .glass {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(20px);
+    }
+
+    .map-container {
+      box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .store-card {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+    
+    .store-card:active {
+      transform: scale(0.985);
+    }
+
+    .income-pill {
+      background: linear-gradient(90deg, #10b981, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 700;
+    }
+
+    .section-header {
+      background: linear-gradient(to right, #0f172a, transparent);
+    }
+
+    .pop-shadow {
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.3),
+                  0 4px 6px -4px rgb(0 0 0 / 0.3);
+    }
+
+    .leaflet-popup-content-wrapper {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 16px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .metric {
+      font-variant-numeric: tabular-nums;
+    }
+
+    .nav-active {
+      color: #10b981;
+      position: relative;
+    }
+    
+    .nav-active:after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(to right, #10b981, transparent);
+    }
   </style>
 </head>
-<body>
-<div class="max-w-[1600px] mx-auto p-4">
-  <div class="flex items-center justify-between mb-4">
-    <div class="flex items-center gap-3">
-      <div class="w-9 h-9 bg-emerald-500 rounded-2xl flex items-center justify-center font-bold text-2xl">P</div>
-      <div class="text-2xl font-semibold tracking-tight">Publix Edge</div>
-    </div>
-    <div class="flex items-center gap-2">
-      <div onclick="manualRefresh()" id="status" class="px-3 py-1 bg-white/5 rounded-xl text-xs cursor-pointer">Refresh</div>
-    </div>
-  </div>
-
-  <div class="flex gap-4 h-[calc(100vh-110px)]">
-    <!-- MAP -->
-    <div class="flex-1">
-      <div id="map" class="w-full h-full rounded-3xl border border-white/10"></div>
-    </div>
-
-    <!-- LIST -->
-    <div class="w-96 flex flex-col bg-[#11131f] rounded-3xl border border-white/10 overflow-hidden">
-      <div class="p-3 border-b border-white/10 font-semibold flex justify-between items-center">
-        <span>Highest Income First</span>
-        <span id="count" class="text-emerald-400 text-xs"></span>
+<body class="bg-[#0a0c14] text-slate-200">
+  
+  <!-- Top Nav -->
+  <div class="sticky top-0 z-50 bg-[#0a0c14]/95 backdrop-blur-lg border-b border-white/10">
+    <div class="max-w-screen-xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 bg-gradient-to-br from-emerald-400 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
+          <span class="text-[#0a0c14] text-2xl font-bold tracking-tighter">P</span>
+        </div>
+        <div>
+          <div class="font-display text-xl font-semibold tracking-tighter">Publix Edge</div>
+          <div class="text-[10px] text-emerald-400 -mt-1">Real Data • Central FL</div>
+        </div>
       </div>
-      <input id="search" placeholder="Search stores..." class="p-3 bg-[#0a0c14] border-b border-white/10 outline-none" oninput="renderList()">
-      <div id="list" class="flex-1 overflow-auto p-2 space-y-1 text-sm"></div>
+      
+      <div class="flex items-center gap-2">
+        <button onclick="useMyLocation()" 
+                class="flex items-center gap-2 px-3 py-1.5 text-sm bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition active:scale-95">
+          <span>📍</span>
+          <span class="hidden sm:inline text-xs">Locate</span>
+        </button>
+        
+        <button onclick="manualRefresh()" 
+                class="flex items-center gap-2 px-3 py-1.5 text-sm bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition active:scale-95">
+          <span>⟳</span>
+          <span class="hidden sm:inline text-xs">Refresh</span>
+        </button>
+      </div>
     </div>
   </div>
-</div>
+
+  <div class="max-w-screen-xl mx-auto">
+    
+    <!-- Mobile: Map first, then list -->
+    <!-- Desktop: Side by side -->
+    <div class="flex flex-col lg:flex-row gap-4 p-4 min-h-[calc(100vh-64px)]">
+      
+      <!-- MAP -->
+      <div class="flex-1 min-h-[380px] lg:min-h-[calc(100vh-100px)] relative">
+        <div class="sticky top-4 lg:sticky lg:top-4">
+          <div class="flex items-center justify-between mb-2 px-1">
+            <div class="text-sm font-medium text-slate-300">Live Map</div>
+            <div onclick="showTimeSimulator()" 
+                 class="text-xs px-2.5 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl cursor-pointer flex items-center gap-1 transition">
+              <span>⏱</span> 
+              <span id="sim-time" class="font-mono text-emerald-300 text-[10px]">Live</span>
+            </div>
+          </div>
+          
+          <div class="map-container w-full h-[380px] lg:h-[calc(100vh-180px)] rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
+            <div id="map" class="w-full h-full"></div>
+          </div>
+          
+          <div id="weather-bar" 
+               class="mt-2 text-xs text-slate-400 bg-white/5 border border-white/10 rounded-2xl px-3 py-1.5 flex items-center gap-2">
+          </div>
+        </div>
+      </div>
+
+      <!-- LIST -->
+      <div class="w-full lg:w-96 flex flex-col bg-[#0f172a] rounded-3xl border border-white/10 shadow-xl overflow-hidden lg:h-[calc(100vh-100px)]">
+        
+        <!-- List Header -->
+        <div class="px-4 py-3 border-b border-white/10 bg-[#0f172a] sticky top-0 z-10">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="font-semibold text-lg tracking-tight">Highest Income</div>
+              <div class="text-[10px] text-emerald-400/70">Real ACS 2023 data • Best tip potential</div>
+            </div>
+            <div id="count" class="text-xs font-mono bg-white/5 px-2 py-1 rounded-lg"></div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="p-3 border-b border-white/10">
+          <div class="relative">
+            <input id="search" 
+                   type="text" 
+                   placeholder="Search name or ZIP..." 
+                   class="w-full bg-[#0a0c14] border border-white/10 focus:border-emerald-400/50 placeholder:text-slate-500 text-sm px-4 py-2.5 rounded-2xl outline-none transition"
+                   oninput="renderList()">
+          </div>
+        </div>
+
+        <!-- List Content -->
+        <div id="list" 
+             class="flex-1 overflow-auto p-2 space-y-1.5 bg-[#0b0f1a] custom-scroll">
+          <!-- Populated by JS -->
+        </div>
+        
+        <div class="p-2 text-[10px] text-center text-slate-500 border-t border-white/10 bg-[#0f172a]">
+          Tap any store to jump on map
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- Bottom nav for mobile -->
+  <div class="lg:hidden fixed bottom-0 left-0 right-0 bg-[#0a0c14]/95 border-t border-white/10 backdrop-blur-lg z-50">
+    <div class="flex justify-around text-xs py-2">
+      <button onclick="document.getElementById('map').scrollIntoView({behavior:'smooth'})" 
+              class="flex flex-col items-center px-4 py-1 text-emerald-400">
+        <span class="text-lg">🗺️</span>
+        <span class="text-[10px]">Map</span>
+      </button>
+      <button onclick="document.getElementById('list').scrollIntoView({behavior:'smooth'})" 
+              class="flex flex-col items-center px-4 py-1">
+        <span class="text-lg">📋</span>
+        <span class="text-[10px]">List</span>
+      </button>
+    </div>
+  </div>
 
 <script>
-// Real 2023 ACS 5-Year Census median household income data
-// Generated from the user's Overpass store locations + Census API run
-
 let stores = [
-  // Baldwin Park (Orlando) - Real ACS 2023 data
   {id:"baldwin", name:"Publix Baldwin Park", address:"Orlando, FL 32814", lat:28.5621, lng:-81.3224, zip:"32814", medianIncome:129712, area:"orlando"},
-
-  // The Villages area - Real ACS 2023 data
   {id:"vil_lake_deaton", name:"Publix Lake Deaton", address:"The Villages, FL 32163", lat:28.875, lng:-81.985, zip:"32163", medianIncome:94565, area:"villages"},
   {id:"vil_brownwood", name:"Publix Brownwood", address:"The Villages, FL 32163", lat:28.89, lng:-82.015, zip:"32163", medianIncome:94565, area:"villages"},
   {id:"vil_spanish_springs", name:"Publix Spanish Springs", address:"The Villages, FL 32162", lat:28.945, lng:-82.005, zip:"32162", medianIncome:73927, area:"villages"},
   {id:"vil_441", name:"Publix The Villages 441", address:"Lady Lake, FL 32159", lat:28.92, lng:-81.93, zip:"32159", medianIncome:57536, area:"villages"},
   {id:"vil_pinellas", name:"Publix Pinellas Plaza", address:"Lady Lake, FL 32159", lat:28.952, lng:-81.922, zip:"32159", medianIncome:57536, area:"villages"},
-
-  // Ocala / Belleview - Real data
   {id:"oca_college", name:"Publix College Road", address:"Ocala, FL 34474", lat:29.137, lng:-82.185, zip:"34474", medianIncome:62150, area:"ocala"},
   {id:"oca_heathbrook", name:"Publix Heathbrook", address:"Ocala, FL 34470", lat:29.204, lng:-82.148, zip:"34470", medianIncome:60283, area:"ocala"},
   {id:"bel_regional", name:"Publix Belleview Regional", address:"Belleview, FL 34420", lat:29.072, lng:-82.072, zip:"34420", medianIncome:52551, area:"belleview"},
-
-  // Tampa area - Real data
   {id:"tpa_south", name:"Publix South Tampa", address:"Tampa, FL 33606", lat:27.949, lng:-82.464, zip:"33606", medianIncome:113634, area:"tampa"},
   {id:"tpa_brandon", name:"Publix Brandon", address:"Brandon, FL 33511", lat:27.932, lng:-82.29, zip:"33511", medianIncome:77383, area:"tampa"},
-
-  // Orlando metro - Real data
   {id:"orl_lake_nona", name:"Publix Lake Nona", address:"Orlando, FL 32827", lat:28.422, lng:-81.272, zip:"32827", medianIncome:88500, area:"orlando"},
   {id:"orl_dr_phillips", name:"Publix Dr Phillips", address:"Orlando, FL 32819", lat:28.426, lng:-81.485, zip:"32819", medianIncome:94386, area:"orlando"},
   {id:"orl_winter_park", name:"Publix Winter Park", address:"Winter Park, FL 32789", lat:28.599, lng:-81.352, zip:"32789", medianIncome:100213, area:"orlando"},
-
-  // Lake County
   {id:"lak_clermont", name:"Publix Clermont", address:"Clermont, FL 34711", lat:28.55, lng:-81.772, zip:"34711", medianIncome:88474, area:"lake"},
-
-  // Additional real entries
   {id:"bp2", name:"Publix Baldwin Park Area", address:"Orlando, FL 32814", lat:28.56, lng:-81.32, zip:"32814", medianIncome:129712, area:"orlando"}
 ];
 
@@ -120,34 +257,55 @@ function getLabel(score) {
 }
 
 function initMap() {
-  map = L.map('map').setView([28.55, -81.65], 8);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+  map = L.map('map', { zoomControl: false, attributionControl: false })
+    .setView([28.55, -81.65], 8);
+  
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    className: 'map-tiles'
+  }).addTo(map);
 }
 
 function createMarker(store) {
   const score = getCurrentBusyness(store);
   const color = getBusynessColor(score);
+  
   const icon = L.divIcon({
-    html: `<div style="background:${color};width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:white;border:2px solid white">${Math.round(score)}</div>`,
-    className: '', iconSize:[26,26]
+    html: `<div style="background:${color};width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:white;border:3px solid rgba(255,255,255,0.9);box-shadow:0 2px 8px rgba(0,0,0,0.3)">${Math.round(score)}</div>`,
+    className: '',
+    iconSize: [28, 28],
+    iconAnchor: [14, 14]
   });
-  const m = L.marker([store.lat, store.lng], {icon}).addTo(map);
 
+  const m = L.marker([store.lat, store.lng], {icon}).addTo(map);
+  
   const label = getLabel(score);
   const popupHtml = `
-    <div style="min-width:240px">
-      <div style="font-weight:600;margin-bottom:2px">${store.name}</div>
-      <div style="font-size:12px;margin-bottom:4px">${store.address}</div>
-      <div style="margin-bottom:6px">
-        <span style="color:#fcd34d;font-weight:600">$${store.medianIncome.toLocaleString()}</span>
-        <span style="font-size:11px"> median HH income (2023 ACS 5-year)</span>
+    <div style="min-width:230px;padding:4px 2px">
+      <div style="font-weight:600;font-size:15px;margin-bottom:4px">${store.name}</div>
+      <div style="font-size:12px;opacity:0.8;margin-bottom:8px">${store.address}</div>
+      
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <div>
+          <div style="font-size:10px;opacity:0.6">MEDIAN INCOME</div>
+          <div style="font-size:15px;font-weight:700;color:#fcd34d">$${store.medianIncome.toLocaleString()}</div>
+        </div>
       </div>
-      <div style="margin-bottom:8px"><span style="background:${color};color:white;padding:1px 6px;border-radius:9999px;font-size:11px">${label.text} (${score})</span></div>
-      <div style="font-size:10px;color:#94a3b8;margin-bottom:6px">Modeled from current time + day of week</div>
-      <a href="https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}" target="_blank" style="color:#10b981;font-size:12px;text-decoration:underline">Open Google Maps → Live Popular Times</a>
+      
+      <div style="margin-bottom:10px">
+        <span style="background:${color};color:white;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600">
+          ${label.text} (${score})
+        </span>
+      </div>
+      
+      <a href="https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}" 
+         target="_blank"
+         style="display:block;text-align:center;background:#10b981;color:#0a0c14;font-weight:600;padding:8px 12px;border-radius:12px;font-size:12px;text-decoration:none">
+        Open in Google Maps → Live Popular Times
+      </a>
     </div>
   `;
-  m.bindPopup(popupHtml);
+  
+  m.bindPopup(popupHtml, { maxWidth: 260, offset: [0, -8] });
   markers[store.id] = m;
 }
 
@@ -158,34 +316,45 @@ function refreshMarkers() {
 }
 
 function renderList(filter = '') {
-  const c = document.getElementById('list');
-  c.innerHTML = '';
+  const container = document.getElementById('list');
+  container.innerHTML = '';
+  
   const q = filter.toLowerCase();
-  const sorted = [...stores].filter(s => !q || (s.name + ' ' + s.address).toLowerCase().includes(q))
-    .sort((a,b) => b.medianIncome - a.medianIncome);
+  const sorted = [...stores]
+    .filter(s => !q || (s.name + ' ' + s.address).toLowerCase().includes(q))
+    .sort((a, b) => b.medianIncome - a.medianIncome);
 
   document.getElementById('count').textContent = sorted.length + ' stores';
 
   sorted.forEach(s => {
     const score = getCurrentBusyness(s);
-    const d = document.createElement('div');
-    d.className = 'store-card p-3 bg-[#0f111c] border border-white/10 rounded-2xl cursor-pointer flex justify-between';
-    d.innerHTML = `
-      <div>
-        <div class="font-semibold">${s.name}</div>
-        <div class="text-xs text-slate-400">${s.address}</div>
+    const color = getBusynessColor(score);
+    const label = getLabel(score);
+    
+    const div = document.createElement('div');
+    div.className = `store-card p-3 bg-[#0f172a] hover:bg-[#1e2937] rounded-2xl cursor-pointer flex gap-3 active:scale-[0.985]`;
+    
+    div.innerHTML = `
+      <div style="background:${color}" class="w-9 h-9 flex-shrink-0 rounded-2xl flex items-center justify-center text-white text-sm font-bold shadow">
+        ${Math.round(score)}
       </div>
-      <div class="text-right">
-        <div class="text-amber-400 font-semibold">$${Math.round(s.medianIncome/1000)}k</div>
-        <div style="font-size:10px">median HH (real)</div>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-sm leading-tight">${s.name}</div>
+        <div class="text-xs text-slate-400 mt-0.5">${s.address}</div>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <div class="font-semibold text-emerald-400 text-sm">$${Math.round(s.medianIncome/1000)}k</div>
+        <div class="text-[10px] text-slate-500">median</div>
       </div>
     `;
-    d.onclick = () => {
-      map.flyTo([s.lat, s.lng], 15);
+    
+    div.onclick = () => {
+      map.flyTo([s.lat, s.lng], 15, { duration: 0.6 });
       const m = markers[s.id];
-      if (m) setTimeout(() => m.openPopup(), 550);
+      if (m) setTimeout(() => m.openPopup(), 650);
     };
-    c.appendChild(d);
+    
+    container.appendChild(div);
   });
 }
 
@@ -194,13 +363,29 @@ function manualRefresh() {
   renderList(document.getElementById('search').value);
 }
 
+function useMyLocation() {
+  if (!navigator.geolocation) {
+    alert("Location not supported");
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos => {
+    map.flyTo([pos.coords.latitude, pos.coords.longitude], 11);
+  });
+}
+
 function init() {
   initMap();
   stores.forEach(createMarker);
   renderList();
-  const searchEl = document.getElementById('search');
-  if (searchEl) searchEl.oninput = () => renderList(searchEl.value);
+  
+  const search = document.getElementById('search');
+  if (search) {
+    search.oninput = () => renderList(search.value);
+  }
+  
+  console.log('%c[PublixEdge] Mobile-friendly UI loaded with ' + stores.length + ' stores', 'color:#166534');
 }
+
 window.onload = init;
 </script>
 </body>
