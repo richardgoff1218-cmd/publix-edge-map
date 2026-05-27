@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a">
+  <title>Publix Edge • Belleview</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap');
+    :root { --sat: env(safe-area-inset-top); }
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .font-display { font-family: 'Space Grotesk', system-ui, sans-serif; }
+    .glass { background: rgba(15,23,42,0.95); backdrop-filter: blur(20px); }
+    .map-container { border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.5); }
+    .store-marker { transition: transform .2s cubic-bezier(0.4,0,0.2,1); }
+    .bottom-sheet { transition: transform .28s cubic-bezier(0.32,0.72,0,1); }
+    .bottom-sheet.hidden { transform: translateY(110%); }
+    .legend-bar { background: linear-gradient(to right, #22c55e, #eab308, #f97316, #ef4444); }
+    .nav-btn { transition: all .1s ease; }
+    .nav-btn:active { transform: scale(0.92); }
+    .obs-btn { transition: all .1s cubic-bezier(0.4,0,0.2,1); }
+    .obs-btn:active { transform: scale(0.95); }
+    .leaflet-popup-content-wrapper { background: #1e2937; color: #e2e8f0; border-radius: 12px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-200 min-h-screen pb-[88px] overscroll-none">
+  <div class="max-w-[1000px] mx-auto">
+    <!-- Top bar -->
+    <div class="sticky top-0 z-40 bg-slate-950/95 backdrop-blur border-b border-slate-800 px-4 pt-[calc(env(safe-area-inset-top)+8px)] pb-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
+            <span class="text-white text-2xl font-bold tracking-tighter">P</span>
+          </div>
+          <div>
+            <div class="font-display text-2xl font-semibold tracking-tighter">Publix Edge</div>
+            <div class="text-[10px] text-emerald-400 -mt-1">Belleview • Instacart</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 text-right">
+          <div id="live-time" class="text-xs font-mono bg-slate-900 border border-slate-700 rounded-2xl px-3 py-1.5"></div>
+          <button onclick="useMyLocation()" class="w-9 h-9 bg-slate-900 border border-slate-700 rounded-2xl flex items-center justify-center text-lg active:bg-slate-800">📍</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick stats + legend -->
+    <div class="px-4 pt-3 pb-2 flex items-center gap-3 text-xs">
+      <div class="flex-1">
+        <div class="text-slate-400 mb-1">Busyness right now</div>
+        <div class="flex items-center gap-2">
+          <div class="flex-1 h-2.5 rounded-full legend-bar"></div>
+          <div class="flex text-[10px] font-medium"><span class="text-emerald-400">Slow</span><span class="px-1.5 text-slate-500">→</span><span class="text-red-400">Packed</span></div>
+        </div>
+      </div>
+      <div onclick="showTimeSimulator()" class="cursor-pointer bg-slate-900 border border-slate-700 rounded-2xl px-3 py-1.5 text-center">
+        <div class="text-[10px] text-slate-400">Simulate</div>
+        <div id="sim-time" class="font-mono text-emerald-300 text-xs">Live</div>
+      </div>
+    </div>
+
+    <!-- Map -->
+    <div class="px-3 pb-2">
+      <div class="glass border border-slate-800 rounded-3xl p-2 shadow-inner" style="height: 56vh; min-height: 340px;">
+        <div id="map" class="map-container w-full h-full"></div>
+      </div>
+    </div>
+
+    <!-- Top opportunities -->
+    <div class="px-4 pt-1 pb-2">
+      <div class="flex items-baseline justify-between mb-2 px-1">
+        <div class="font-semibold text-sm tracking-tight">Best right now</div>
+        <div onclick="refreshAll()" class="text-emerald-400 text-xs flex items-center gap-1 cursor-pointer active:opacity-60">
+          <span>⟳</span> <span>Refresh</span>
+        </div>
+      </div>
+      <div id="opp-list" class="grid grid-cols-1 gap-2"></div>
+    </div>
+
+    <!-- My recent logs quick view -->
+    <div class="px-4 pt-1 pb-4">
+      <div class="flex items-center justify-between mb-1.5 px-1">
+        <div class="text-xs font-medium text-slate-400">Your observations (influence scores)</div>
+        <button onclick="showMyData()" class="text-xs text-emerald-400 active:text-emerald-300">View all &amp; export CSV →</button>
+      </div>
+      <div id="recent-logs" class="text-xs text-slate-400 flex gap-2 overflow-x-auto pb-1"></div>
+    </div>
+  </div>
+
+  <!-- Bottom nav -->
+  <div class="fixed bottom-0 left-0 right-0 z-50 bg-slate-900/95 border-t border-slate-700 backdrop-blur px-2 pb-[calc(env(safe-area-inset-bottom)+4px)] pt-1">
+    <div class="max-w-[1000px] mx-auto flex justify-around text-xs">
+      <button onclick="toggleTradeAreas()" class="nav-btn flex flex-col items-center py-1 px-4 text-slate-300 active:text-white">
+        <span class="text-xl mb-px">🗺️</span>
+        <span class="text-[10px]">Trade Areas</span>
+      </button>
+      <button onclick="showMyData()" class="nav-btn flex flex-col items-center py-1 px-4 text-slate-300 active:text-white">
+        <span class="text-xl mb-px">📋</span>
+        <span class="text-[10px]">My Data</span>
+      </button>
+      <button onclick="useMyLocation()" class="nav-btn flex flex-col items-center py-1 px-4 text-slate-300 active:text-white">
+        <span class="text-xl mb-px">📍</span>
+        <span class="text-[10px]">My Location</span>
+      </button>
+      <button onclick="refreshAll(true)" class="nav-btn flex flex-col items-center py-1 px-4 text-slate-300 active:text-white">
+        <span class="text-xl mb-px">⟳</span>
+        <span class="text-[10px]">Recompute</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Store Detail Bottom Sheet -->
+  <div id="detail-sheet" class="hidden fixed bottom-0 left-0 right-0 z-[60] bg-slate-900 border-t border-slate-700 rounded-t-3xl shadow-2xl max-h-[82vh] overflow-hidden" style="max-width:1000px;margin:0 auto;">
+    <div class="px-4 pt-3 pb-2 flex items-center justify-between border-b border-slate-800">
+      <div class="font-semibold text-lg truncate pr-4" id="sheet-name"></div>
+      <button onclick="closeSheet()" class="text-3xl leading-none text-slate-400 active:text-white px-2">×</button>
+    </div>
+    <div class="p-4 overflow-auto max-h-[calc(82vh-120px)] text-sm space-y-4">
+      <div id="sheet-meta" class="flex gap-4 text-xs text-slate-400"></div>
+
+      <div>
+        <div class="text-xs uppercase tracking-widest text-slate-400 mb-1.5">Current busyness</div>
+        <div class="flex items-center gap-3">
+          <div id="sheet-score" class="text-6xl font-semibold tabular-nums w-16"></div>
+          <div>
+            <div id="sheet-label" class="font-semibold text-lg"></div>
+            <div id="sheet-explain" class="text-xs text-slate-400 leading-tight"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-950 border border-slate-800 rounded-2xl p-3">
+        <div class="text-xs text-slate-400 mb-1">Area median household income</div>
+        <div id="sheet-income" class="font-semibold text-2xl text-emerald-300"></div>
+        <div id="sheet-zip" class="text-xs text-slate-500"></div>
+      </div>
+
+      <div>
+        <div class="text-xs uppercase tracking-widest text-slate-400 mb-1.5">Estimated shopper neighborhoods</div>
+        <div id="sheet-trade" class="text-sm leading-snug text-slate-300 bg-slate-950 border border-slate-800 rounded-2xl p-3"></div>
+        <button onclick="highlightTradeArea()" class="mt-2 text-xs w-full py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 rounded-2xl border border-slate-700">Highlight trade area on map</button>
+      </div>
+
+      <!-- Logging -->
+      <div>
+        <div class="text-xs uppercase tracking-widest text-slate-400 mb-2">Log what you see RIGHT NOW (saves on your phone)</div>
+        <div class="grid grid-cols-4 gap-2">
+          <button onclick="logObservation(2)" class="obs-btn col-span-1 py-3 text-sm font-medium bg-emerald-500/10 hover:bg-emerald-500/20 active:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 rounded-2xl">Quiet</button>
+          <button onclick="logObservation(5)" class="obs-btn col-span-1 py-3 text-sm font-medium bg-yellow-500/10 hover:bg-yellow-500/20 active:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 rounded-2xl">Normal</button>
+          <button onclick="logObservation(7.5)" class="obs-btn col-span-1 py-3 text-sm font-medium bg-orange-500/10 hover:bg-orange-500/20 active:bg-orange-500/30 text-orange-400 border border-orange-500/30 rounded-2xl">Busy</button>
+          <button onclick="logObservation(9.5)" class="obs-btn col-span-1 py-3 text-sm font-medium bg-red-500/10 hover:bg-red-500/20 active:bg-red-500/30 text-red-400 border border-red-500/30 rounded-2xl">Packed</button>
+        </div>
+        <div class="text-[10px] text-center text-slate-500 mt-1.5">Your logs strongly adjust future predictions for this store</div>
+      </div>
+
+      <div class="flex gap-2 pt-1">
+        <button onclick="openGoogleForCurrent()" class="flex-1 py-3 text-sm font-medium bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/10 rounded-2xl">Google Maps + Live Times →</button>
+        <button onclick="closeSheet()" class="flex-1 py-3 text-sm font-medium bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 rounded-2xl">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ============== DATA ==============
+let stores = [
+  { id: "bel1", name: "Publix Belleview Regional", address: "10301 SE US Hwy 441, Belleview, FL 34420", lat: 29.0713, lng: -82.0713, zip: "34420", medianIncome: 52800, area: "belleview", tradeNote: "Belleview, Summerfield, parts of SE Ocala. Primary local shoppers + some from The Villages north edge." },
+  { id: "oca1", name: "Publix on SW College Rd", address: "Ocala, FL 34474", lat: 29.138, lng: -82.185, zip: "34474", medianIncome: 49200, area: "ocala", tradeNote: "West Ocala, College Road corridor, near I-75. Mix of suburban families." },
+  { id: "oca2", name: "Publix Market Street at Heathbrook", address: "Ocala, FL", lat: 29.205, lng: -82.148, zip: "34470", medianIncome: 47100, area: "ocala", tradeNote: "North Ocala, Silver Springs area. Steady local volume." },
+  { id: "vil1", name: "Publix Lake Deaton Plaza", address: "695 Kristine Way, The Villages, FL 32163", lat: 28.875, lng: -81.985, zip: "32163", medianIncome: 96700, area: "villages", tradeNote: "Central & North The Villages (many villages). Extremely dense retiree population — high order volume, excellent tips.", tradePoly: [[28.865,-82.01],[28.882,-82.01],[28.905,-81.96],[28.895,-81.94],[28.87,-81.96]] },
+  { id: "vil2", name: "Publix The Villages (441)", address: "1400 N US Hwy 441, Lady Lake, FL 32159", lat: 28.92, lng: -81.93, zip: "32159", medianIncome: 81200, area: "villages", tradeNote: "North The Villages + Lady Lake. High density, very strong evening + weekend rushes." },
+  { id: "vil3", name: "Publix Spanish Springs", address: "The Villages, FL 32162", lat: 28.94, lng: -82.01, zip: "32162", medianIncome: 88500, area: "villages", tradeNote: "Spanish Springs Town Square zone. Tourist + local retiree mix, very busy lunch & early evening." },
+  { id: "sum1", name: "Publix Wildwood", address: "Wildwood, FL", lat: 28.85, lng: -82.04, zip: "34785", medianIncome: 61200, area: "villages", tradeNote: "Wildwood / south Villages spillover. Growing fast." },
+  { id: "sum2", name: "Publix Oxford", address: "Oxford, FL", lat: 28.93, lng: -82.09, zip: "34484", medianIncome: 64500, area: "villages", tradeNote: "Oxford area — serves parts of The Villages south + local." },
+  { id: "lak1", name: "Publix Leesburg", address: "Leesburg, FL", lat: 28.81, lng: -81.88, zip: "34748", medianIncome: 48500, area: "lake", tradeNote: "Leesburg core. Solid volume, lower income than Villages." },
+  { id: "lak2", name: "Publix Mount Dora", address: "Mount Dora, FL", lat: 28.80, lng: -81.64, zip: "32757", medianIncome: 68200, area: "lake", tradeNote: "Mount Dora / Tanger area. Affluent pocket, good tips." },
+  { id: "cit1", name: "Publix Inverness", address: "Inverness, FL", lat: 28.835, lng: -82.33, zip: "34452", medianIncome: 45100, area: "citrus", tradeNote: "Inverness / Citrus County. Lower density but reliable." },
+  { id: "ala1", name: "Publix Gainesville (Archer)", address: "Gainesville, FL", lat: 29.62, lng: -82.37, zip: "32608", medianIncome: 51200, area: "north", tradeNote: "South Gainesville / student + family mix. Different rhythm (later peaks)." },
+  { id: "ala2", name: "Publix Gainesville (Newberry)", address: "Gainesville, FL", lat: 29.67, lng: -82.42, zip: "32605", medianIncome: 54900, area: "north", tradeNote: "Northwest Gainesville. Steady university-area volume." },
+  { id: "her1", name: "Publix Brooksville", address: "Brooksville, FL", lat: 28.55, lng: -82.39, zip: "34601", medianIncome: 43200, area: "hernando", tradeNote: "Brooksville / Hernando. Edge of practical range for Belleview dashers." },
+  { id: "bel2", name: "Publix Summerfield", address: "Summerfield, FL", lat: 29.01, lng: -82.01, zip: "34491", medianIncome: 56100, area: "belleview", tradeNote: "Summerfield + The Villages west access. Good balance of volume & tips." },
+  { id: "oca3", name: "Publix SE 17th St Ocala", address: "Ocala, FL", lat: 29.17, lng: -82.12, zip: "34471", medianIncome: 50900, area: "ocala", tradeNote: "East Ocala, near hospitals. Consistent lunch + dinner rushes." },
+  { id: "vil4", name: "Publix Brownwood", address: "The Villages, FL 32163", lat: 28.89, lng: -82.02, zip: "32163", medianIncome: 92000, area: "villages", tradeNote: "Brownwood Paddock Square zone. One of the busiest in The Villages system." },
+  { id: "lak3", name: "Publix Eustis", address: "Eustis, FL", lat: 28.85, lng: -81.68, zip: "32726", medianIncome: 49800, area: "lake", tradeNote: "Eustis / Tavares area. Growing, mixed demographics." },
+  { id: "cit2", name: "Publix Crystal River", address: "Crystal River, FL", lat: 28.90, lng: -82.60, zip: "34429", medianIncome: 47200, area: "citrus", tradeNote: "Crystal River / Homosassa. Lower density, scenic area." },
+  { id: "bel3", name: "Publix Candler", address: "Candler, FL", lat: 29.10, lng: -81.99, zip: "32111", medianIncome: 48900, area: "belleview", tradeNote: "Candler / Ocklawaha. Rural edge but steady local." },
+  { id: "oca4", name: "Publix 200 West Ocala", address: "Ocala, FL 34475", lat: 29.21, lng: -82.19, zip: "34475", medianIncome: 43800, area: "ocala", tradeNote: "West Ocala near I-75. High volume trucker + local mix." },
+  { id: "vil5", name: "Publix Pinellas Plaza (Lady Lake)", address: "Lady Lake, FL", lat: 28.95, lng: -81.92, zip: "32159", medianIncome: 74300, area: "villages", tradeNote: "Lady Lake core. Serves north Villages + local. Excellent tip potential." }
+];
+
+// Trade area polygons (for stores that have them)
+const tradePolygons = {};
+let activeTradeLayer = null;
+let showingTradeAreas = false;
+
+// User observations (persisted)
+let observations = JSON.parse(localStorage.getItem('publix_edge_obs') || '[]');
+
+function saveObservations() {
+  localStorage.setItem('publix_edge_obs', JSON.stringify(observations));
+}
+
+// ============== BUSYNESS MODEL ==============
+function getPredictedScore(store, at = new Date()) {
+  const hour = at.getHours();
+  const day = at.getDay(); // 0=Sun ... 6=Sat
+  const isWeekend = day === 0 || day === 6;
+  const isFriday = day === 5;
+
+  let base = 4.5;
+
+  // Core grocery patterns (tuned for FL / retiree heavy areas)
+  if (hour >= 6 && hour <= 9) base += 1.5;           // morning ramp
+  if (hour >= 11 && hour <= 14) base += (isWeekend ? 2.5 : 1.8); // lunch
+  if (hour >= 16 && hour <= 19) base += (isWeekend ? 4.2 : 5.0); // strong dinner peak
+  if (hour >= 19 && hour <= 21) base += (isWeekend ? 3.0 : 2.2);
+  if (hour >= 7 && hour <= 10 && isWeekend) base += 1.0; // weekend brunch
+
+  if (isFriday) base += 1.2;
+  if (isWeekend) base += 0.8;
+
+  // Profile adjustments (The Villages stores behave differently)
+  if (store.area === 'villages') {
+    if (hour >= 10 && hour <= 16) base += 1.3; // snowbird lunch + early dinner
+    if (hour >= 16 && hour <= 19) base += 0.8;
+  }
+  if (store.area === 'ocala' || store.area === 'belleview') {
+    if (hour >= 17 && hour <= 20) base += 0.6; // working families
+  }
+
+  // Small live feeling variation (stable within 15min windows)
+  const jitterSeed = Math.floor(at.getTime() / (1000 * 60 * 15));
+  const jitter = ((jitterSeed % 7) - 3) * 0.35;
+
+  let score = Math.max(1.5, Math.min(10, base + jitter));
+
+  // Blend with user's real observations (last 8 weeks weighted)
+  const recent = observations.filter(o => o.storeId === store.id && (Date.now() - o.ts) < 1000*60*60*24*56);
+  if (recent.length >= 2) {
+    const avgObs = recent.reduce((s, o) => s + o.score, 0) / recent.length;
+    const weight = Math.min(0.75, recent.length * 0.11);
+    score = score * (1 - weight) + avgObs * weight;
+  }
+  return Math.round(score * 10) / 10;
+}
+
+function getBusynessColor(score) {
+  // 1=green (120) ... 10=red (0)
+  const h = Math.max(0, 120 - (score / 10 * 120));
+  return `hsl(${h}, 82%, 52%)`;
+}
+
+function getLabel(score) {
+  if (score <= 3.5) return {text: 'Quiet', cls: 'text-emerald-400'};
+  if (score <= 5.5) return {text: 'Normal', cls: 'text-yellow-400'};
+  if (score <= 7.5) return {text: 'Busy', cls: 'text-orange-400'};
+  return {text: 'Packed', cls: 'text-red-400'};
+}
+
+function getOpportunity(store, score) {
+  // Higher income + lower busyness = better
+  return (store.medianIncome / 1200) - (score * 6.2);
+}
+
+// ============== MAP & MARKERS ==============
+let map, markers = {};
+
+function initMap() {
+  map = L.map('map', { zoomControl: false, attributionControl: false }).setView([28.98, -81.95], 9);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { className: 'map-tiles' }).addTo(map);
+
+  // Belleview center marker (reference)
+  L.circle([29.061, -82.055], { radius: 800, color: '#64748b', fillOpacity: 0.1, weight: 1 }).addTo(map);
+}
+
+function createOrUpdateMarker(store) {
+  const score = getPredictedScore(store);
+  const color = getBusynessColor(score);
+  const iconHtml = `
+    <div style="background:${color};" class="w-9 h-9 rounded-2xl flex items-center justify-center text-white text-[15px] font-bold shadow-xl ring-2 ring-white/60">${Math.round(score)}</div>
+  `;
+  const icon = L.divIcon({ className: 'store-marker', html: iconHtml, iconSize: [36,36], iconAnchor: [18,18] });
+
+  if (markers[store.id]) {
+    markers[store.id].setIcon(icon);
+    markers[store.id].off('click');
+  } else {
+    markers[store.id] = L.marker([store.lat, store.lng], {icon}).addTo(map);
+  }
+  markers[store.id].on('click', () => openSheet(store.id));
+
+  // Simple circle fallback for all (trade area hint)
+  if (!store.tradePoly) {
+    // light circle
+    if (markers[store.id]._circle) map.removeLayer(markers[store.id]._circle);
+    const c = L.circle([store.lat, store.lng], { radius: 4200, color: '#64748b', weight: 1, fillOpacity: 0.07, fillColor: '#64748b' }).addTo(map);
+    markers[store.id]._circle = c;
+  }
+}
+
+function refreshMarkers() {
+  stores.forEach(s => createOrUpdateMarker(s));
+}
+
+function toggleTradeAreas() {
+  showingTradeAreas = !showingTradeAreas;
+  if (activeTradeLayer) { map.removeLayer(activeTradeLayer); activeTradeLayer = null; }
+
+  if (showingTradeAreas) {
+    const polys = stores.filter(s => s.tradePoly).map(s => {
+      return L.polygon(s.tradePoly, { color: '#a3e635', weight: 2.5, fillOpacity: 0.12, fillColor: '#a3e635' });
+    });
+    if (polys.length) {
+      activeTradeLayer = L.layerGroup(polys).addTo(map);
+    }
+    // toast
+    const t = document.createElement('div');
+    t.className = 'fixed bottom-[110px] left-1/2 -translate-x-1/2 bg-slate-800 text-xs px-4 py-1.5 rounded-3xl border border-slate-600 shadow';
+    t.textContent = 'Green outlines = estimated dense shopper zones';
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 2400);
+  }
+}
+
+function highlightTradeArea() {
+  const store = window.currentSheetStore;
+  if (!store) return;
+  if (activeTradeLayer) map.removeLayer(activeTradeLayer);
+  if (store.tradePoly) {
+    activeTradeLayer = L.polygon(store.tradePoly, { color: '#eab308', weight: 3.5, fillOpacity: 0.18, fillColor: '#eab308' }).addTo(map);
+    map.fitBounds(activeTradeLayer.getBounds(), { padding: [30,30], maxZoom: 13 });
+  } else {
+    // fallback circle highlight
+    const c = L.circle([store.lat, store.lng], { radius: 5500, color: '#eab308', weight: 2.5, fillOpacity: 0.12 }).addTo(map);
+    activeTradeLayer = c;
+    setTimeout(() => { if (activeTradeLayer === c) map.removeLayer(c); activeTradeLayer = null; }, 6500);
+  }
+}
+
+// ============== SHEET ==============
+window.currentSheetStore = null;
+
+function openSheet(storeId) {
+  const store = stores.find(s => s.id === storeId);
+  if (!store) return;
+  window.currentSheetStore = store;
+
+  const score = getPredictedScore(store);
+  const lab = getLabel(score);
+  const explain = getExplainText(store, score);
+
+  document.getElementById('sheet-name').textContent = store.name;
+  document.getElementById('sheet-score').textContent = score.toFixed(1);
+  document.getElementById('sheet-score').style.color = getBusynessColor(score);
+  document.getElementById('sheet-label').innerHTML = `<span class="${lab.cls}">${lab.text}</span>`;
+  document.getElementById('sheet-explain').textContent = explain;
+
+  document.getElementById('sheet-income').innerHTML = '$' + store.medianIncome.toLocaleString() + ' <span class="text-xs font-normal text-slate-400">median HH</span>';
+  document.getElementById('sheet-zip').textContent = 'ZIP ' + store.zip;
+
+  document.getElementById('sheet-trade').innerHTML = store.tradeNote || 'Typical 4–7 mile primary trade area based on roads and density.';
+  document.getElementById('sheet-meta').innerHTML = `<div>${store.address}</div><div class="font-mono text-emerald-300">${(getDistanceTo(store)*0.000621371).toFixed(1)} mi from you</div>`;
+
+  const sheet = document.getElementById('detail-sheet');
+  sheet.classList.remove('hidden');
+  sheet.style.transform = 'translateY(0)';
+}
+
+function getExplainText(store, score) {
+  const hour = new Date().getHours();
+  let why = 'Time-of-day pattern';
+  if (hour >= 16 && hour <= 20) why = 'Evening dinner rush';
+  if (hour >= 11 && hour <= 14) why = 'Lunch peak';
+  if (store.area === 'villages' && hour >= 10 && hour <= 16) why = 'Villages snowbird pattern';
+  const recentCount = observations.filter(o => o.storeId === store.id && Date.now()-o.ts < 1000*60*60*24*14).length;
+  if (recentCount >= 2) why += ` • ${recentCount} of your recent logs`;
+  return why;
+}
+
+function closeSheet() {
+  const sheet = document.getElementById('detail-sheet');
+  sheet.style.transform = 'translateY(120%)';
+  setTimeout(() => sheet.classList.add('hidden'), 280);
+  if (activeTradeLayer) { map.removeLayer(activeTradeLayer); activeTradeLayer = null; }
+}
+
+function logObservation(score) {
+  const store = window.currentSheetStore;
+  if (!store) return;
+  observations.push({ storeId: store.id, score, ts: Date.now() });
+  if (observations.length > 180) observations.shift(); // cap
+  saveObservations();
+
+  // immediate visual update
+  createOrUpdateMarker(store);
+  renderOpportunities();
+
+  // subtle feedback
+  const btns = document.querySelectorAll('#detail-sheet button');
+  btns.forEach(b => b.style.opacity = '0.3');
+  setTimeout(() => { btns.forEach(b => b.style.opacity = '1'); }, 420);
+
+  // refresh recent logs strip
+  renderRecentLogs();
+}
+
+function openGoogleForCurrent() {
+  const store = window.currentSheetStore;
+  if (!store) return;
+  const q = encodeURIComponent(store.name + ' ' + store.address);
+  window.open(`https://www.google.com/maps/search/?api=1&query=${q}`, '_blank');
+}
+
+// ============== OPPORTUNITIES LIST ==============
+function renderOpportunities() {
+  const container = document.getElementById('opp-list');
+  container.innerHTML = '';
+
+  const scored = stores.map(s => ({s, score: getPredictedScore(s), opp: getOpportunity(s, getPredictedScore(s)) }));
+  scored.sort((a,b) => b.opp - a.opp);
+
+  scored.slice(0, 6).forEach(item => {
+    const {s, score, opp} = item;
+    const lab = getLabel(score);
+    const div = document.createElement('div');
+    div.className = `flex gap-3 items-center glass border border-slate-800 rounded-2xl p-3 active:scale-[0.985] cursor-pointer`;
+    div.innerHTML = `
+      <div style="background:${getBusynessColor(score)};" class="w-10 h-10 flex-shrink-0 rounded-2xl text-white flex items-center justify-center font-bold text-lg shadow">${Math.round(score)}</div>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold truncate">${s.name}</div>
+        <div class="text-xs text-emerald-300">$${Math.round(s.medianIncome/1000)}k • ${lab.text}</div>
+      </div>
+      <div class="text-right text-xs font-mono text-slate-400">${(getDistanceTo(s)*0.000621371).toFixed(0)}mi</div>
+    `;
+    div.onclick = () => openSheet(s.id);
+    container.appendChild(div);
+  });
+}
+
+// ============== RECENT LOGS STRIP ==============
+function renderRecentLogs() {
+  const el = document.getElementById('recent-logs');
+  el.innerHTML = '';
+  if (observations.length === 0) {
+    el.innerHTML = '<span class="px-2">No observations yet — tap a store &amp; log what you actually see.</span>';
+    return;
+  }
+  const recent = [...observations].sort((a,b)=>b.ts-a.ts).slice(0,5);
+  recent.forEach(o => {
+    const st = stores.find(s=>s.id===o.storeId);
+    if (!st) return;
+    const d = new Date(o.ts);
+    const pill = document.createElement('div');
+    pill.className = `flex-shrink-0 px-3 py-1 rounded-2xl bg-slate-800 border border-slate-700 text-xs whitespace-nowrap`;
+    pill.innerHTML = `${st.name.split(' ')[1]||st.name} <span class="font-mono text-emerald-300">${o.score.toFixed(0)}</span> <span class="text-slate-500">${d.toLocaleDateString([],{month:'numeric',day:'numeric'})}</span>`;
+    pill.onclick = () => openSheet(st.id);
+    el.appendChild(pill);
+  });
+}
+
+// ============== GPS & DISTANCE ==============
+let userPos = null;
+
+function getDistanceTo(store) {
+  if (!userPos) return 15000;
+  const R = 6371e3;
+  const lat1 = userPos.lat * Math.PI/180, lat2 = store.lat * Math.PI/180;
+  const dLat = (store.lat - userPos.lat) * Math.PI/180;
+  const dLon = (store.lng - userPos.lng) * Math.PI/180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function useMyLocation() {
+  if (!navigator.geolocation) { alert('GPS not available'); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    map.setView([userPos.lat, userPos.lng], 11);
+    // add or move user dot
+    if (window.userMarker) map.removeLayer(window.userMarker);
+    window.userMarker = L.circleMarker([userPos.lat, userPos.lng], { radius: 7, color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.9, weight: 2 }).addTo(map);
+    renderOpportunities();
+    // quick toast
+    const t = document.createElement('div');
+    t.className = 'fixed top-20 left-1/2 -translate-x-1/2 bg-blue-500/90 text-white text-xs px-4 py-1 rounded-3xl';
+    t.textContent = 'Location set — distances updated';
+    document.body.appendChild(t); setTimeout(()=>t.remove(), 1800);
+  }, () => alert('Could not get location. Enable GPS permission.'));
+}
+
+// ============== TIME SIMULATOR ==============
+let simDate = null;
+
+function showTimeSimulator() {
+  const now = new Date();
+  const html = `
+    <div class="fixed inset-0 bg-black/70 z-[70] flex items-end" onclick="this.remove()">
+      <div class="glass border-t border-slate-700 w-full rounded-t-3xl p-5" onclick="event.stopImmediatePropagation()">
+        <div class="font-semibold mb-3">Simulate time of day</div>
+        <input type="range" min="0" max="23" step="1" value="${now.getHours()}" class="w-full accent-emerald-400" id="sim-slider" oninput="applySimTime(this.value)">
+        <div class="flex justify-between text-xs text-slate-400 mt-1"><div>6am</div><div>12pm</div><div>6pm</div><div>11pm</div></div>
+        <div class="mt-4 flex gap-2">
+          <button onclick="applySimPreset(17,6)" class="flex-1 py-2 bg-slate-800 rounded-2xl text-sm">Tonight 6pm rush</button>
+          <button onclick="applySimPreset(11,0)" class="flex-1 py-2 bg-slate-800 rounded-2xl text-sm">Sunday lunch</button>
+          <button onclick="clearSim()" class="flex-1 py-2 bg-slate-800 rounded-2xl text-sm">Back to live</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+  document.getElementById('sim-slider').oninput = function(){ applySimTime(this.value); };
+}
+
+function applySimTime(h) {
+  simDate = new Date(); simDate.setHours(parseInt(h), 30, 0, 0);
+  document.getElementById('sim-time').textContent = simDate.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  refreshAll();
+}
+
+function applySimPreset(hour, day) {
+  simDate = new Date();
+  simDate.setHours(hour, 15, 0, 0);
+  if (day !== undefined) simDate.setDate(simDate.getDate() + (day - simDate.getDay()));
+  document.querySelectorAll('.fixed.inset-0').forEach(el=>el.remove());
+  document.getElementById('sim-time').textContent = simDate.toLocaleTimeString([], {hour:'numeric', minute:'2-digit'});
+  refreshAll();
+}
+
+function clearSim() {
+  simDate = null;
+  document.querySelectorAll('.fixed.inset-0').forEach(el=>el.remove());
+  document.getElementById('sim-time').textContent = 'Live';
+  refreshAll();
+}
+
+function getSimDate() { return simDate || new Date(); }
+
+// ============== MAIN REFRESH ==============
+function refreshAll(forceRandom = false) {
+  if (forceRandom) {
+    // force a small perturbation for "live" feel
+    const old = observations.length;
+  }
+  refreshMarkers();
+  renderOpportunities();
+}
+
+// ============== MY DATA / EXPORT ==============
+function showMyData() {
+  const container = document.createElement('div');
+  container.className = 'fixed inset-0 bg-black/80 z-[75] flex items-end';
+  const obsByStore = {};
+  observations.forEach(o => { obsByStore[o.storeId] = (obsByStore[o.storeId]||0) + 1; });
+
+  let html = `<div class="glass w-full max-h-[80vh] rounded-t-3xl p-5 overflow-auto" style="max-width:1000px;margin:0 auto;" onclick="event.target.remove()">
+    <div class="font-semibold text-xl mb-1">Your gathered data</div>
+    <div class="text-xs text-slate-400 mb-4">${observations.length} total observations • stored only on this phone</div>`;
+
+  if (observations.length === 0) {
+    html += `<div class="py-8 text-center text-slate-400">No logs yet. Open any store and tap Quiet/Normal/Busy/Packed when you are there.</div>`;
+  } else {
+    html += `<div class="space-y-2 mb-6">`;
+    Object.keys(obsByStore).forEach(sid => {
+      const st = stores.find(s=>s.id===sid);
+      html += `<div class="bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2 text-sm flex justify-between"><div>${st?st.name:sid}</div><div class="font-mono text-emerald-300">${obsByStore[sid]} logs</div></div>`;
+    });
+    html += `</div>`;
+
+    html += `<button onclick="exportCSV(event)" class="w-full py-3.5 text-sm font-semibold bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-black rounded-2xl">Export all my observations as CSV</button>`;
+    html += `<button onclick="clearMyData(event)" class="w-full py-3 mt-2 text-sm text-red-400 border border-red-900/60 rounded-2xl">Clear all my data</button>`;
+  }
+  html += `</div>`;
+  container.innerHTML = html;
+  document.body.appendChild(container);
+}
+
+function exportCSV(e) {
+  e.stopImmediatePropagation();
+  const header = 'timestamp,store_id,store_name,score\n';
+  const rows = observations.map(o => {
+    const st = stores.find(s=>s.id===o.storeId);
+    return `${new Date(o.ts).toISOString()},${o.storeId},"${st?st.name.replace(/"/g,'') : ''}",${o.score}`;
+  }).join('\n');
+  const blob = new Blob([header + rows], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `publix-edge-observations-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearMyData(e) {
+  if (!confirm('Delete all your observation history?')) return;
+  e.stopImmediatePropagation();
+  observations = [];
+  saveObservations();
+  document.querySelectorAll('.fixed.inset-0').forEach(el=>el.remove());
+  renderRecentLogs();
+  refreshAll();
+}
+
+// ============== INIT ==============
+function updateClock() {
+  const el = document.getElementById('live-time');
+  const d = getSimDate();
+  el.textContent = d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+function initialize() {
+  // seed a couple demo observations if first run (remove for production if desired)
+  if (observations.length === 0) {
+    const demoStore = stores.find(s => s.area === 'villages');
+    if (demoStore) {
+      observations.push({storeId: demoStore.id, score: 8.5, ts: Date.now() - 1000*60*60*3});
+      observations.push({storeId: demoStore.id, score: 6, ts: Date.now() - 1000*60*60*26});
+      saveObservations();
+    }
+  }
+
+  initMap();
+
+  // initial markers
+  stores.forEach(s => createOrUpdateMarker(s));
+
+  renderOpportunities();
+  renderRecentLogs();
+
+  // clock
+  setInterval(updateClock, 30000);
+  updateClock();
+
+  // initial hint
+  setTimeout(() => {
+    if (observations.length < 3) {
+      const hint = document.createElement('div');
+      hint.className = 'fixed bottom-[108px] left-4 right-4 max-w-[1000px] mx-auto glass border border-emerald-900/40 text-xs px-4 py-2 rounded-3xl flex items-center gap-2';
+      hint.innerHTML = `<span>Tip: Tap any marker, then log what you actually see. Your data improves predictions.</span><button class="ml-auto text-emerald-400" onclick="this.parentElement.remove()">Got it</button>`;
+      document.body.appendChild(hint);
+      setTimeout(()=>{ if(hint.parentElement) hint.remove(); }, 9500);
+    }
+  }, 5200);
+
+  // PWA install prompt handling (basic)
+  if ('serviceWorker' in navigator) {
+    // we skip full SW for v1; manifest alone enables Add to Home Screen
+  }
+
+  console.log('%c[PublixEdge] Initialized with ' + stores.length + ' stores. Your observations: ' + observations.length, 'color:#166534');
+}
+
+window.onload = initialize;
+</script>
+</body>
+</html>
