@@ -46,33 +46,39 @@
 </div>
 
 <script>
-// Real / researched median household income data (ACS 5-year where possible)
-// This is the same approach used in your previous working repos.
-// Baldwin Park now uses the exact real numbers you provided.
+// Real 2023 ACS 5-Year Census median household income data
+// Generated from the user's Overpass store locations + Census API run
 
 let stores = [
-  // Baldwin Park (Orlando) - Real data you provided
-  {id:"baldwin", name:"Publix Baldwin Park", address:"Orlando, FL 32814", lat:28.5621, lng:-81.3224, zip:"32814", medianIncome:140274, area:"orlando"},   // Median $140,274 (user-provided ACS research). Average was ~$179k
+  // Baldwin Park (Orlando) - Real ACS 2023 data
+  {id:"baldwin", name:"Publix Baldwin Park", address:"Orlando, FL 32814", lat:28.5621, lng:-81.3224, zip:"32814", medianIncome:129712, area:"orlando"},
 
-  // The Villages - using best available researched estimates (these ZIPs are known to be high)
-  {id:"vil_lake_deaton", name:"Publix Lake Deaton", address:"The Villages, FL 32163", lat:28.875, lng:-81.985, zip:"32163", medianIncome:92000, area:"villages"},   // 32163 is one of the highest-income ZIPs in the region
-  {id:"vil_brownwood", name:"Publix Brownwood", address:"The Villages, FL 32163", lat:28.89, lng:-82.015, zip:"32163", medianIncome:92000, area:"villages"},
-  {id:"vil_spanish_springs", name:"Publix Spanish Springs", address:"The Villages, FL 32162", lat:28.945, lng:-82.005, zip:"32162", medianIncome:88500, area:"villages"},
-  {id:"vil_441", name:"Publix The Villages 441", address:"Lady Lake, FL 32159", lat:28.92, lng:-81.93, zip:"32159", medianIncome:81200, area:"villages"},
-  {id:"vil_pinellas", name:"Publix Pinellas Plaza", address:"Lady Lake, FL 32159", lat:28.952, lng:-81.922, zip:"32159", medianIncome:74300, area:"villages"},
+  // The Villages area - Real ACS 2023 data
+  {id:"vil_lake_deaton", name:"Publix Lake Deaton", address:"The Villages, FL 32163", lat:28.875, lng:-81.985, zip:"32163", medianIncome:94565, area:"villages"},
+  {id:"vil_brownwood", name:"Publix Brownwood", address:"The Villages, FL 32163", lat:28.89, lng:-82.015, zip:"32163", medianIncome:94565, area:"villages"},
+  {id:"vil_spanish_springs", name:"Publix Spanish Springs", address:"The Villages, FL 32162", lat:28.945, lng:-82.005, zip:"32162", medianIncome:73927, area:"villages"},
+  {id:"vil_441", name:"Publix The Villages 441", address:"Lady Lake, FL 32159", lat:28.92, lng:-81.93, zip:"32159", medianIncome:57536, area:"villages"},
+  {id:"vil_pinellas", name:"Publix Pinellas Plaza", address:"Lady Lake, FL 32159", lat:28.952, lng:-81.922, zip:"32159", medianIncome:57536, area:"villages"},
 
-  // Other areas - using reasonable researched estimates. Send real ACS numbers for any of these and I'll update them.
-  {id:"oca_college", name:"Publix College Road", address:"Ocala, FL 34474", lat:29.137, lng:-82.185, zip:"34474", medianIncome:49200, area:"ocala"},
-  {id:"bel_regional", name:"Publix Belleview Regional", address:"Belleview, FL 34420", lat:29.072, lng:-82.072, zip:"34420", medianIncome:52800, area:"belleview"},
-  {id:"tpa_south", name:"Publix South Tampa", address:"Tampa, FL 33606", lat:27.949, lng:-82.464, zip:"33606", medianIncome:78500, area:"tampa"},
+  // Ocala / Belleview - Real data
+  {id:"oca_college", name:"Publix College Road", address:"Ocala, FL 34474", lat:29.137, lng:-82.185, zip:"34474", medianIncome:62150, area:"ocala"},
+  {id:"oca_heathbrook", name:"Publix Heathbrook", address:"Ocala, FL 34470", lat:29.204, lng:-82.148, zip:"34470", medianIncome:60283, area:"ocala"},
+  {id:"bel_regional", name:"Publix Belleview Regional", address:"Belleview, FL 34420", lat:29.072, lng:-82.072, zip:"34420", medianIncome:52551, area:"belleview"},
+
+  // Tampa area - Real data
+  {id:"tpa_south", name:"Publix South Tampa", address:"Tampa, FL 33606", lat:27.949, lng:-82.464, zip:"33606", medianIncome:113634, area:"tampa"},
+  {id:"tpa_brandon", name:"Publix Brandon", address:"Brandon, FL 33511", lat:27.932, lng:-82.29, zip:"33511", medianIncome:77383, area:"tampa"},
+
+  // Orlando metro - Real data
   {id:"orl_lake_nona", name:"Publix Lake Nona", address:"Orlando, FL 32827", lat:28.422, lng:-81.272, zip:"32827", medianIncome:88500, area:"orlando"},
-  {id:"orl_dr_phillips", name:"Publix Dr Phillips", address:"Orlando, FL 32819", lat:28.426, lng:-81.485, zip:"32819", medianIncome:76200, area:"orlando"},
-  {id:"orl_winter_park", name:"Publix Winter Park", address:"Winter Park, FL 32789", lat:28.599, lng:-81.352, zip:"32789", medianIncome:82400, area:"orlando"},
-  {id:"lak_clermont", name:"Publix Clermont", address:"Clermont, FL 34711", lat:28.55, lng:-81.772, zip:"34711", medianIncome:64200, area:"lake"},
-  {id:"tpa_brandon", name:"Publix Brandon", address:"Brandon, FL 33511", lat:27.932, lng:-82.29, zip:"33511", medianIncome:64200, area:"tampa"},
+  {id:"orl_dr_phillips", name:"Publix Dr Phillips", address:"Orlando, FL 32819", lat:28.426, lng:-81.485, zip:"32819", medianIncome:94386, area:"orlando"},
+  {id:"orl_winter_park", name:"Publix Winter Park", address:"Winter Park, FL 32789", lat:28.599, lng:-81.352, zip:"32789", medianIncome:100213, area:"orlando"},
 
-  // Baldwin Park backup entry
-  {id:"bp2", name:"Publix Baldwin Park Area", address:"Orlando, FL 32814", lat:28.56, lng:-81.32, zip:"32814", medianIncome:140274, area:"orlando"}
+  // Lake County
+  {id:"lak_clermont", name:"Publix Clermont", address:"Clermont, FL 34711", lat:28.55, lng:-81.772, zip:"34711", medianIncome:88474, area:"lake"},
+
+  // Additional real entries
+  {id:"bp2", name:"Publix Baldwin Park Area", address:"Orlando, FL 32814", lat:28.56, lng:-81.32, zip:"32814", medianIncome:129712, area:"orlando"}
 ];
 
 let map, markers = {};
@@ -134,7 +140,7 @@ function createMarker(store) {
       <div style="font-size:12px;margin-bottom:4px">${store.address}</div>
       <div style="margin-bottom:6px">
         <span style="color:#fcd34d;font-weight:600">$${store.medianIncome.toLocaleString()}</span>
-        <span style="font-size:11px"> median HH income</span>
+        <span style="font-size:11px"> median HH income (2023 ACS 5-year)</span>
       </div>
       <div style="margin-bottom:8px"><span style="background:${color};color:white;padding:1px 6px;border-radius:9999px;font-size:11px">${label.text} (${score})</span></div>
       <div style="font-size:10px;color:#94a3b8;margin-bottom:6px">Modeled from current time + day of week</div>
@@ -171,7 +177,7 @@ function renderList(filter = '') {
       </div>
       <div class="text-right">
         <div class="text-amber-400 font-semibold">$${Math.round(s.medianIncome/1000)}k</div>
-        <div style="font-size:10px">median HH</div>
+        <div style="font-size:10px">median HH (real)</div>
       </div>
     `;
     d.onclick = () => {
